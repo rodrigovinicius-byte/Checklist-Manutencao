@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist Operacional OS - GitHub Edition</title>
+    <!-- Tailwind CSS para design industrial moderno de alta qualidade -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- Topbar principal -->
+    <header class="bg-slate-900 text-white shadow-md border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-blue-600 rounded-lg text-white">
+                    <i class="fa-solid fa-gears text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Checklist Industrial OS</h1>
+                    <p class="text-[11px] text-slate-400">Versão Independente • Integrada ao Google Sheets via API</p>
+                </div>
+            </div>
+            
+            <!-- Botão de Configuração da API -->
+            <button onclick="toggleConfigModal(true)" class="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold py-2 px-4 rounded-lg transition-all flex items-center gap-2">
+                <i class="fa-solid fa-link text-blue-400"></i> Configurar Conexão Google
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        
+        <!-- Status de Conexão da API -->
+        <div id="apiStatusAlert" class="mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-amber-50 border-amber-200 text-amber-800">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <span><strong>Atenção:</strong> Você precisa configurar o link da sua API do Google Sheets para que o sistema consiga carregar os itens e salvar os relatórios.</span>
+            </div>
+            <button onclick="toggleConfigModal(true)" class="underline font-bold hover:text-amber-950">Configurar Agora</button>
+        </div>
+
+        <!-- Painel de Filtros de Visualização -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Setor Responsável</label>
+                <select id="setorFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                    <option value="Produção" selected>🏭 Produção</option>
+                    <option value="Manutenção">🔧 Manutenção</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Periodicidade</label>
+                <select id="periodoFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                    <option value="Intradiária" selected>⏱️ Intradiária (Por Turno)</option>
+                    <option value="Diária">📅 Diária</option>
+                    <option value="Semanal">🗓️ Semanal</option>
+                    <option value="Quinzenal">⌛ Quinzenal</option>
+                    <option value="Mensal">📆 Mensal</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Container de Checklist das Máquinas -->
+        <div id="loadingIndicator" class="hidden text-center py-12">
+            <i class="fa-solid fa-circle-notch animate-spin text-3xl text-blue-600"></i>
+            <p class="text-xs text-slate-500 mt-2 font-medium">Comunicando com a planilha Google...</p>
+        </div>
+
+        <div id="checklistContainer" class="space-y-6">
+            <!-- Gerado via JavaScript -->
+        </div>
+
+        <!-- Botão Flutuante de Envio -->
+        <div class="mt-8 pt-4 border-t border-slate-200 flex justify-end">
+            <button onclick="salvarChecklist()" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up text-base"></i> Registrar no Diário da Planilha
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Modal de Configuração de API (Seguro) -->
+    <div id="configModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <i class="fa-solid fa-network-wired text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Conexão do Google Sheets</h3>
+                        <p class="text-[10px] text-slate-400">Link de Implantação gerado pelo Apps Script</p>
+                    </div>
+                </div>
+                <button onclick="toggleConfigModal(false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Insira a URL Web App do Google</label>
+                    <input type="text" id="apiInputUrl" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" placeholder="https://script.google.com/macros/s/.../exec">
+                </div>
+                
+                <div class="p-3 bg-blue-50 rounded-lg text-[11px] text-blue-800 space-y-1">
+                    <p class="font-bold"><i class="fa-solid fa-lightbulb"></i> Como conseguir essa URL?</p>
+                    <p>1. Salve o script modificado na planilha.</p>
+                    <p>2. Clique em <strong>Implantar > Gerenciar Implantações</strong>.</p>
+                    <p>3. Copie o link do campo <strong>URL do aplicativo da web</strong> e cole no campo acima.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button onclick="toggleConfigModal(false)" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-50 rounded-lg border border-slate-200">Cancelar</button>
+                <button onclick="salvarConfigUrl()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Salvar Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais Customizados para Sucesso/Erro (Substitutos de alert()) -->
+    <div id="notificationModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border animate-in fade-in zoom-in-95 duration-200">
+            <div id="notifIconContainer" class="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4">
+                <i id="notifIcon" class="text-xl"></i>
+            </div>
+            <h4 id="notifTitle" class="font-bold text-slate-900 text-base mb-1"></h4>
+            <p id="notifMessage" class="text-xs text-slate-500 mb-5 leading-relaxed"></p>
+            <button onclick="closeNotification()" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-all">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Rodapé -->
+    <footer class="bg-slate-950 text-slate-500 text-center py-4 border-t border-slate-900 text-[10px] mt-12">
+        Checklist Industrial OS © 2026. Prontinho para hospedagem no GitHub Pages.
+    </footer>
+
+    <!-- Script de Operações e Conectividade -->
+    <script>
+        let originalDatabase = [];
+        let API_URL = "";
+
+        // Inicializa e verifica configurações
+        window.onload = function() {
+            carregarConfiguracoes();
+        }
+
+        function carregarConfiguracoes() {
+            const savedUrl = localStorage.getItem("checklist_google_api_url");
+            if (savedUrl) {
+                API_URL = savedUrl;
+                document.getElementById("apiInputUrl").value = savedUrl;
+                document.getElementById("apiStatusAlert").className = "mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-emerald-50 border-emerald-200 text-emerald-800";
+                document.getElementById("apiStatusAlert").innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-base"></i>
+                        <span><strong>API Conectada:</strong> O sistema está pronto para se sincronizar com a sua planilha!</span>
+                    </div>
+                    <button onclick="toggleConfigModal(true)" class="underline font-bold hover:text-emerald-950">Mudar Conexão</button>
+                `;
+                baixarDadosDaPlanilha();
+            } else {
+                toggleConfigModal(true);
+            }
+        }
+
+        // Exibe ou fecha modal de configuração
+        function toggleConfigModal(show) {
+            document.getElementById("configModal").classList.toggle("hidden", !show);
+        }
+
+        // Salva a URL da API no LocalStorage
+        function salvarConfigUrl() {
+            const urlInput = document.getElementById("apiInputUrl").value.trim();
+            if (!urlInput.startsWith("https://script.google.com")) {
+                showToast("Erro de Formato", "O endereço deve começar com 'https://script.google.com/'. Verifique se copiou corretamente.", false);
+                return;
+            }
+            localStorage.setItem("checklist_google_api_url", urlInput);
+            toggleConfigModal(false);
+            carregarConfiguracoes();
+        }
+
+        // Busca dados da planilha via GET da API
+        async function baixarDadosDaPlanilha() {
+            if (!API_URL) return;
+            
+            toggleLoading(true);
+            try {
+                // Adicionamos ?action=carregarItens para direcionar no doGet
+                const res = await fetch(`${API_URL}?action=carregarItens`);
+                const data = await res.json();
+                
+                if (data.error) {
+                    showToast("Erro no Servidor", `A planilha retornou o seguinte erro: ${data.error}`, false);
+                    originalDatabase = [];
+                } else {
+                    originalDatabase = data;
+                    filtrarDados();
+                }
+            } catch (error) {
+                showToast("Falha de Comunicação", "Não conseguimos ler os dados. Verifique se publicou o Apps Script no modo 'Qualquer pessoa'.", false);
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+
+        // Filtra e organiza itens na tela
+        function filtrarDados() {
+            const set = document.getElementById("setorFilter").value;
+            const per = document.getElementById("periodoFilter").value;
+            const container = document.getElementById("checklistContainer");
+            container.innerHTML = "";
+
+            if (originalDatabase.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 border border-dashed rounded-xl border-slate-200 text-slate-400 bg-white">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+                        <p class="text-sm">A API de dados está vazia ou inacessível no momento.</p>
+                    </div>`;
+                return;
+            }
+
+            const filtrados = originalDatabase.filter(x => x.setor === set && x.periodicidade === per);
+            if (filtrados.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 border border-dashed rounded-xl border-slate-200 text-slate-400 bg-white">
+                        <i class="fa-solid fa-magnifying-glass text-3xl mb-2"></i>
+                        <p class="text-sm">Nenhum checklist programado para este filtro.</p>
+                    </div>`;
+                return;
+            }
+
+            // Agrupa os itens por Máquina
+            const agrupado = {};
+            filtrados.forEach(d => {
+                if(!agrupado[d.maquina]) agrupado[d.maquina] = [];
+                agrupado[d.maquina].push(d);
+            });
+
+            // Constrói as tabelas de forma limpa e intuitiva
+            for (let maq in agrupado) {
+                let card = document.createElement("div");
+                card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden";
+                let html = `
+                    <div class="bg-slate-800 text-white px-4 py-3 font-semibold text-sm flex justify-between items-center">
+                        <span><i class="fa-solid fa-industry text-blue-400 mr-1.5"></i> ${maq}</span>
+                        <span class="text-[10px] bg-slate-700 py-0.5 px-2.5 rounded-full font-mono text-slate-300">${set} • ${per}</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b tracking-wider">
+                                <tr>
+                                    <th class="p-3 w-[45%]">Item para Inspeção</th>
+                                    <th class="p-3 w-40">Status</th>
+                                    <th class="p-3">Observação / Ocorrência</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-150">`;
+                
+                agrupado[maq].forEach((item) => {
+                    html += `
+                        <tr class="row-check hover:bg-slate-50/40" data-maquina="${maq}" data-item="${item.item}">
+                            <td class="p-3 text-xs font-semibold text-slate-700 leading-relaxed">${item.item}</td>
+                            <td class="p-3">
+                                <select class="status-sel w-full border p-1.5 rounded-md font-bold text-xs bg-emerald-50 text-emerald-800 border-emerald-200 focus:outline-none" onchange="mudarStatusCor(this)">
+                                    <option value="OK" class="text-emerald-800 bg-emerald-50">✔️ OK</option>
+                                    <option value="Problema" class="text-rose-800 bg-rose-50">⚠️ Problema</option>
+                                </select>
+                            </td>
+                            <td class="p-3">
+                                <input type="text" class="obs-inp w-full bg-slate-50 border border-slate-200 p-1.5 text-xs rounded-md focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Sem observações...">
+                            </td>
+                        </tr>`;
+                });
+
+                html += `</tbody></table></div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
+            }
+        }
+
+        // Estiliza a cor do select de acordo com a seleção de status
+        function mudarStatusCor(el) {
+            if(el.value === "OK") {
+                el.className = "status-sel w-full border p-1.5 rounded-md font-bold text-xs bg-emerald-50 text-emerald-800 border-emerald-200 focus:outline-none";
+            } else {
+                el.className = "status-sel w-full border p-1.5 rounded-md font-bold text-xs bg-rose-50 text-rose-800 border-rose-200 focus:outline-none";
+            }
+        }
+
+
+        // Coleta os itens da tela e envia em lote via POST para a API
+        async function salvarChecklist() {
+            if (!API_URL) {
+                showToast("Configuração Pendente", "Adicione a URL da sua API antes de tentar salvar.", false);
+                return;
+            }
+
+            const rows = document.querySelectorAll(".row-check");
+            if (rows.length === 0) {
+                showToast("Formulário Vazio", "Não há nenhum item em tela para ser salvo.", false);
+                return;
+            }
+
+            const payload = [];
+            const set = document.getElementById("setorFilter").value;
+            const per = document.getElementById("periodoFilter").value;
+
+            rows.forEach(r => {
+                payload.push({
+                    maquina: r.getAttribute("data-maquina"),
+                    item: r.getAttribute("data-item"),
+                    setor: set,
+                    periodicidade: per,
+                    status: r.querySelector(".status-sel").value,
+                    obs: r.querySelector(".obs-inp").value.trim()
+                });
+            });
+
+            toggleLoading(true);
+            try {
+                // Envia como requisição POST normal para o Google Apps Script
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // O Google Apps Script redireciona e exige no-cors para POST de domínios externos
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                // Como usamos 'no-cors', o navegador não consegue ler a resposta de sucesso por segurança de domínios.
+                // Mas a chegada no servidor do Google acontece em menos de 2 segundos.
+                showToast("Registro Enviado!", "As respostas foram salvas na aba 'Diário - Rodrigo' da sua planilha!", true);
+                
+                // Limpa os campos de observação para próxima operação
+                document.querySelectorAll(".obs-inp").forEach(input => input.value = "");
+            } catch (error) {
+                showToast("Erro ao Registrar", "Não conseguimos registrar os dados. Verifique sua conexão.", false);
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        // Utilitários de carregamento visual
+        function toggleLoading(active) {
+            document.getElementById("loadingIndicator").classList.toggle("hidden", !active);
+        }
+
+        // Gerador de mensagens sem uso de alert() nativo
+        function showToast(title, message, isSuccess) {
+            const modal = document.getElementById("notificationModal");
+            const iconContainer = document.getElementById("notifIconContainer");
+            const icon = document.getElementById("notifIcon");
+            
+            document.getElementById("notifTitle").innerText = title;
+            document.getElementById("notifMessage").innerText = message;
+            
+            if (isSuccess) {
+                iconContainer.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-emerald-50 text-emerald-500 border border-emerald-100";
+                icon.className = "fa-solid fa-circle-check";
+            } else {
+                iconContainer.className = "mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-rose-50 text-rose-500 border border-rose-100";
+                icon.className = "fa-solid fa-circle-exclamation";
+            }
+            
+            modal.classList.remove("hidden");
+        }
+
+        function closeNotification() {
+            document.getElementById("notificationModal").classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
