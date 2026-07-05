@@ -3,152 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checklist Operacional - Controle de Manutenção</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-    </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col">
-
-    <header class="bg-slate-900 text-white shadow-md border-b border-slate-700">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-blue-600 rounded-lg"><i class="fa-solid fa-screwdriver-wrench text-xl"></i></div>
-                <div>
-                    <h1 class="font-bold">Checklist de Manutenção</h1>
-                    <p class="text-[10px] text-slate-400">Sincronizado com Google Sheets</p>
-                </div>
-            </div>
-            <button onclick="toggleConfigModal(true)" class="bg-slate-800 border border-slate-700 text-xs py-2 px-4 rounded-lg hover:bg-slate-700">Configurar Conexão</button>
-        </div>
-    </header>
-
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6">
-        <div id="apiStatusAlert" class="mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-amber-50 border-amber-200 text-amber-800">
-            <span>Atenção: Configure a URL da sua API para começar.</span>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Setor</label>
-                <select id="setorFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm"></select>
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Periodicidade</label>
-                <select id="periodoFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm"></select>
-            </div>
-        </div>
-
-        <div id="loadingIndicator" class="hidden text-center py-12"><i class="fa-solid fa-circle-notch animate-spin text-3xl text-blue-600"></i></div>
-        <div id="checklistContainer" class="space-y-6"></div>
-
-        <div class="mt-8 pt-4 border-t border-slate-200 flex justify-end">
-            <button onclick="salvarChecklist()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Checklist
-            </button>
-        </div>
-    </main>
-
-    <!-- Modal Config e Notificações (mesma estrutura anterior) -->
-    <div id="configModal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6">
-            <h3 class="font-bold mb-4">Conexão do Google Sheets</h3>
-            <input type="text" id="apiInputUrl" class="w-full border rounded-lg p-2.5 mb-4 text-xs" placeholder="Cole a URL do Apps Script aqui">
-            <button onclick="salvarConfigUrl()" class="w-full py-2 bg-blue-600 text-white rounded-lg">Salvar Link</button>
+<body class="p-6 bg-slate-50">
+    <div id="container" class="max-w-2xl mx-auto">
+        <h1 class="text-xl font-bold mb-6 text-slate-800"><i class="fa-solid fa-clipboard-check mr-2 text-blue-600"></i>Checklist de Máquinas</h1>
+        <div id="lista" class="space-y-4">
+            <p class="text-center text-slate-500 py-10">Carregando itens...</p>
         </div>
     </div>
 
     <script>
-        let originalDatabase = [];
-        let API_URL = localStorage.getItem("checklist_google_api_url") || "";
+        // Use aspas nas URLs!
+        const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbz_967kA31TkPc1-ijxu1d3bgYaebnEUYscP2pYkO9tdRbZV4an3zX_fQip7WZznSm6rg/exec";
 
-        window.onload = () => {
-            if (API_URL) baixarDadosDaPlanilha();
-            else toggleConfigModal(true);
-        };
-
-        async function baixarDadosDaPlanilha() {
-            toggleLoading(true);
+        async function carregarDados() {
             try {
-                const res = await fetch(`${API_URL}?action=carregarItens`);
-                originalDatabase = await res.json();
-                
-                // Popular filtros dinamicamente
-                const setores = [...new Set(originalDatabase.map(i => i.setor))];
-                const periodos = [...new Set(originalDatabase.map(i => i.periodicidade))];
-                
-                document.getElementById('setorFilter').innerHTML = setores.map(s => `<option value="${s}">${s}</option>`).join('');
-                document.getElementById('periodoFilter').innerHTML = periodos.map(p => `<option value="${p}">${p}</option>`).join('');
-                
-                filtrarDados();
-            } catch (e) { alert("Erro ao carregar dados."); }
-            toggleLoading(false);
-        }
-
-        function filtrarDados() {
-            const set = document.getElementById("setorFilter").value;
-            const per = document.getElementById("periodoFilter").value;
-            const container = document.getElementById("checklistContainer");
-            container.innerHTML = "";
-
-            const filtrados = originalDatabase.filter(x => x.setor === set && x.periodicidade === per);
-            const agrupado = {};
-            filtrados.forEach(d => {
-                if(!agrupado[d.maquina]) agrupado[d.maquina] = [];
-                agrupado[d.maquina].push(d);
-            });
-
-            for (let maq in agrupado) {
-                let html = `
-                    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div class="bg-slate-800 text-white px-4 py-3 font-bold">${maq}</div>
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
-                                <tr><th class="p-3">Item / Instrução</th><th class="p-3">Operador</th><th class="p-3">Status</th><th class="p-3">OBS</th></tr>
-                            </thead>
-                            <tbody>`;
-                agrupado[maq].forEach(item => {
-                    html += `
-                        <tr class="row-check" data-maquina="${maq}" data-item="${item.item}">
-                            <td class="p-3 text-xs font-medium">
-                                ${item.item}
-                                ${item.obs ? `<div class="mt-1 text-[10px] text-blue-700 italic bg-blue-50 p-1 rounded">Obs: ${item.obs}</div>` : ''}
-                            </td>
-                            <td class="p-3"><input type="text" class="operador-inp w-full border rounded p-1 text-xs" placeholder="Nome"></td>
-                            <td class="p-3"><select class="status-sel border rounded p-1 text-xs"><option value="OK">OK</option><option value="Problema">Problema</option></select></td>
-                            <td class="p-3"><input type="text" class="obs-inp w-full border rounded p-1 text-xs" placeholder="Descreva problemas..."></td>
-                        </tr>`;
-                });
-                html += `</tbody></table></div>`;
-                container.innerHTML += html;
+                const response = await fetch(URL_WEB_APP);
+                const data = await response.json();
+                renderizar(data);
+            } catch (err) {
+                document.getElementById('lista').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar: ${err}</p>`;
             }
         }
 
-        async function salvarChecklist() {
-            const rows = document.querySelectorAll(".row-check");
-            const payload = Array.from(rows).map(r => ({
-                maquina: r.getAttribute("data-maquina"),
-                item: r.getAttribute("data-item"),
-                setor: document.getElementById("setorFilter").value,
-                periodicidade: document.getElementById("periodoFilter").value,
-                status: r.querySelector(".status-sel").value,
-                operador: r.querySelector(".operador-inp").value,
-                obs: r.querySelector(".obs-inp").value
-            }));
-
-            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-            alert("Checklist registrado com sucesso!");
+        function renderizar(data) {
+            const lista = document.getElementById('lista');
+            lista.innerHTML = "";
+            
+            data.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-200";
+                div.innerHTML = `
+                    <div class="mb-3">
+                        <h3 class="font-bold text-slate-800">${item.maquina}</h3>
+                        <p class="text-xs text-slate-500">${item.item}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <input type="text" id="op-${index}" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="Nome do Operador">
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="st-${index}" class="border p-2 rounded text-sm bg-slate-50">
+                                <option value="OK">✔️ OK</option>
+                                <option value="Problema">⚠️ Problema</option>
+                            </select>
+                            <button onclick="registrar(${index}, '${item.maquina}', '${item.item}', '${item.setor}', '${item.periodicidade}')" 
+                                    class="bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700">
+                                Registrar
+                            </button>
+                        </div>
+                        <input type="text" id="ob-${index}" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="Observações (opcional)">
+                    </div>
+                `;
+                lista.appendChild(div);
+            });
         }
 
-        function toggleLoading(active) { document.getElementById("loadingIndicator").classList.toggle("hidden", !active); }
-        function toggleConfigModal(show) { document.getElementById("configModal").classList.toggle("hidden", !show); }
-        function salvarConfigUrl() { 
-            localStorage.setItem("checklist_google_api_url", document.getElementById("apiInputUrl").value);
-            location.reload(); 
+        async function registrar(idx, maq, item, setor, periodo) {
+            const payload = {
+                maquina: maq,
+                item: item,
+                setor: setor,
+                periodicidade: periodo,
+                operador: document.getElementById(`op-${idx}`).value,
+                status: document.getElementById(`st-${idx}`).value,
+                obs: document.getElementById(`ob-${idx}`).value
+            };
+
+            if(!payload.operador) return alert("Preencha o nome do operador!");
+
+            const btn = event.target;
+            btn.innerText = "Enviando...";
+            
+            try {
+                await fetch(URL_WEB_APP, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                alert("Registrado com sucesso!");
+                btn.innerText = "Registrar";
+            } catch (err) {
+                alert("Erro ao enviar.");
+                btn.innerText = "Registrar";
+            }
         }
+
+        window.onload = carregarDados;
     </script>
 </body>
 </html>
+```
+
+### O que eu corrigi:
+1.  **Sintaxe JavaScript:** Adicionei as aspas necessárias na variável `URL_WEB_APP` e na chamada `fetch`.
+2.  **Lógica de Renderização:** Preenchi a função `renderizar` para criar o layout (cards) para cada item que vem da planilha.
+3.  **Botão Registrar:** Conectei o botão ao evento de clique, passando os dados daquele item específico.
+4.  **UX (Experiência):** Adicionei uma estrutura básica com Tailwind para que a lista fique organizada e fácil de usar no celular.
+
+**Dica importante:** Se o erro de "Carregando..." persistir, verifique se no seu `Código.gs` (no Google Apps Script) você tem uma função `doGet` que retorna os dados via `ContentService.createTextOutput(JSON.stringify(lista))`. Se não tiver, o GitHub nunca receberá o JSON.
