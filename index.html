@@ -52,7 +52,6 @@
         </div>
     </main>
 
-    <!-- Modal Config e Notificações (mesma estrutura anterior) -->
     <div id="configModal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6">
             <h3 class="font-bold mb-4">Conexão do Google Sheets</h3>
@@ -103,8 +102,14 @@
 
             for (let maq in agrupado) {
                 let html = `
-                    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div class="bg-slate-800 text-white px-4 py-3 font-bold">${maq}</div>
+                    <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
+                        <div class="bg-slate-800 text-white px-4 py-3 font-bold flex items-center justify-between">
+                            <span>${maq}</span>
+                            <button onclick="imprimirFolhaPapel('${maq.replace(/'/g, "\\'")}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-medium py-1 px-2.5 rounded transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-print"></i> Imprimir p/ Papel
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
                                 <tr><th class="p-3">Item / Instrução</th><th class="p-3">Operador</th><th class="p-3">Status</th><th class="p-3">OBS</th></tr>
@@ -122,7 +127,7 @@
                             <td class="p-3"><input type="text" class="obs-inp w-full border rounded p-1 text-xs" placeholder="Descreva o problema..."></td>
                         </tr>`;
                 });
-                html += `</tbody></table></div>`;
+                html += `</tbody></table></div></div>`;
                 container.innerHTML += html;
             }
         }
@@ -148,6 +153,130 @@
         function salvarConfigUrl() { 
             localStorage.setItem("checklist_google_api_url", document.getElementById("apiInputUrl").value);
             location.reload(); 
+        }
+
+        // Função de Impressão de Folha Física Inteligente e Responsiva
+        function imprimirFolhaPapel(maquina) {
+            const set = document.getElementById("setorFilter").value;
+            const per = document.getElementById("periodoFilter").value;
+            const filtrados = originalDatabase.filter(x => x.setor === set && x.periodicidade === per && x.maquina === maquina);
+            
+            const periodoNorm = (per || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            
+            let cabecalhosColunas = [];
+            let tituloLinhaDatas = "Datas";
+
+            if (periodoNorm.includes("diari") || periodoNorm.includes("intradi")) {
+                tituloLinhaDatas = "Dias da Semana";
+                for (let i = 0; i < 7; i++) {
+                    let d = new Date();
+                    d.setDate(d.getDate() + i);
+                    let dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    cabecalhosColunas.push(dataFormatada);
+                }
+            } else if (periodoNorm.includes("semanal")) {
+                tituloLinhaDatas = "Semanas";
+                cabecalhosColunas = ["1ª Semana", "2ª Semana", "3ª Semana", "4ª Semana"];
+            } else if (periodoNorm.includes("quinzenal")) {
+                tituloLinhaDatas = "Quinzenas";
+                cabecalhosColunas = ["1ª Quinzena", "2ª Quinzena", "3ª Quinzena", "4ª Quinzena"];
+            } else if (periodoNorm.includes("mensal")) {
+                tituloLinhaDatas = "Meses";
+                cabecalhosColunas = ["1º Mês", "2º Mês", "3º Mês", "4º Mês"];
+            } else {
+                tituloLinhaDatas = "Controle";
+                cabecalhosColunas = ["Col 1", "Col 2", "Col 3", "Col 4", "Col 5"];
+            }
+            
+            let numColunas = cabecalhosColunas.length;
+            let printWindow = window.open('', '_blank');
+            
+            let htmlRows = '';
+            filtrados.forEach(item => {
+                htmlRows += `
+                    <tr>
+                        <td colspan="${1 + numColunas}" style="background-color: #0f172a; height: 6px; border: none;"></td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px; text-transform: uppercase; width: 18%;">Item</td>
+                        <td colspan="${numColunas}" style="border: 1px solid #cbd5e1; padding: 6px; font-weight: 500;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                                <span>${item.item}</span>
+                                <span style="font-size: 10px; color: #475569; font-weight: bold; background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px;">Setor: ${set}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px;">Operador / Manutentor</td>
+                        ${Array(numColunas).fill(`<td style="border: 1px solid #cbd5e1; padding: 6px;"></td>`).join('')}
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px;">Status</td>
+                        ${Array(numColunas).fill(`
+                            <td style="border: 1px solid #cbd5e1; padding: 5px; font-size: 10px;">
+                                <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 4px;">
+                                    <div style="width: 11px; height: 11px; border: 1px solid #475569; display: inline-block; margin-right: 5px;"></div>
+                                    <span>OK</span>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: flex-start;">
+                                    <div style="width: 11px; height: 11px; border: 1px solid #475569; display: inline-block; margin-right: 5px;"></div>
+                                    <span>Problema</span>
+                                </div>
+                            </td>
+                        `).join('')}
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px;">OBS:</td>
+                        ${Array(numColunas).fill(`<td style="border: 1px solid #cbd5e1; padding: 6px; height: 22px;"></td>`).join('')}
+                    </tr>
+                `;
+            });
+
+            let headerDatasHtml = cabecalhosColunas.map(cab => `<td class="date-value" style="width: ${82 / numColunas}%; font-size: 11px;">${cab}</td>`).join('');
+
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Checklist Impresso - ${maquina}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 10px; color: #0f172a; }
+                        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                        .main-header { background-color: #0f172a; color: white; font-weight: bold; padding: 8px; border: 1px solid #0f172a; text-transform: uppercase; font-size: 10px; }
+                        .value-header { background-color: #f1f5f9; color: #0f172a; font-weight: bold; font-size: 13px; text-align: center; border: 1px solid #cbd5e1; padding: 6px; text-transform: uppercase; }
+                        .date-header { background-color: #0f172a; color: white; font-weight: bold; border: 1px solid #0f172a; padding: 6px; text-transform: uppercase; font-size: 10px; }
+                        .date-value { background-color: white; color: #0f172a; font-weight: bold; text-align: center; border: 1px solid #cbd5e1; padding: 6px; }
+                        @media print {
+                            body { margin: 0; }
+                            tr { page-break-inside: avoid; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <table>
+                        <tr>
+                            <td class="main-header" style="width: 18%;">Maquina/ Equipamento</td>
+                            <td colspan="${numColunas}" class="value-header">${maquina}</td>
+                        </tr>
+                        <tr>
+                            <td class="main-header">Periodicidade</td>
+                            <td colspan="${numColunas}" class="value-header" style="font-size: 11px;">${per}</td>
+                        </tr>
+                        <tr>
+                            <td class="date-header">${tituloLinhaDatas}</td>
+                            ${headerDatasHtml}
+                        </tr>
+                        ${htmlRows}
+                    </table>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            setTimeout(function() { window.close(); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
         }
     </script>
 </body>
