@@ -1,101 +1,154 @@
-function doGet(e) {
-  try {
-    var action = e.parameter.action;
-    
-    if (action === "carregarItens") {
-      var itens = carregarItensDoSheets();
-      return criarResponseOutput(itens);
-    }
-    
-    return HtmlService.createHtmlOutput(
-      "<div style='font-family: sans-serif; padding: 40px; text-align: center; color: #1e293b; background-color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;'>" +
-      "  <div style='background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px;'>" +
-      "    <h2 style='color: #0f172a; margin-bottom: 8px;'>🔌 API do Checklist Operacional Conectada!</h2>" +
-      "    <p style='color: #64748b; font-size: 14px; line-height: 1.5;'>Sua planilha e seu script estão configurados corretamente.</p>" +
-      "    <div style='background: #f1f5f9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 15px; color: #334155;'>" +
-      "      Status: Ativo • Planilha: " + SpreadsheetApp.getActiveSpreadsheet().getName() +
-      "    </div>" +
-      "  </div>" +
-      "</div>"
-    ).setTitle("API Checklist OS");
-    
-  } catch (error) {
-    return criarResponseOutput({ error: error.toString() });
-  }
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist Operacional - Controle de Manutenção</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
 
-function doPost(e) {
-  try {
-    var dadosString = e.postData.contents;
-    var dadosJson = JSON.parse(dadosString);
-    var resultado = salvarChecklistNoSheets(dadosJson);
-    return criarResponseOutput(resultado);
-  } catch (error) {
-    return criarResponseOutput({ success: false, error: error.toString() });
-  }
-}
+    <header class="bg-slate-900 text-white shadow-md border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-blue-600 rounded-lg"><i class="fa-solid fa-screwdriver-wrench text-xl"></i></div>
+                <div>
+                    <h1 class="font-bold">Checklist de Manutenção</h1>
+                    <p class="text-[10px] text-slate-400">Sincronizado com Google Sheets</p>
+                </div>
+            </div>
+            <button onclick="toggleConfigModal(true)" class="bg-slate-800 border border-slate-700 text-xs py-2 px-4 rounded-lg hover:bg-slate-700">Configurar Conexão</button>
+        </div>
+    </header>
 
-function criarResponseOutput(objeto) {
-  return ContentService.createTextOutput(JSON.stringify(objeto))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6">
+        <div id="apiStatusAlert" class="mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-amber-50 border-amber-200 text-amber-800">
+            <span>Atenção: Configure a URL da sua API para começar.</span>
+        </div>
 
-function carregarItensDoSheets() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Itens/ Verificação") || ss.getSheetByName("Itens/ Verificacao");
-    if (!sheet) throw new Error("Aba 'Itens/ Verificação' não encontrada.");
-    
-    var data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return [];
-    
-    var list = [];
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      if (!row[0]) continue;
-      
-      list.push({
-        item: String(row[0]).trim(),
-        maquina: row[1] ? String(row[1]).trim() : "Equipamento Geral",
-        setor: row[2] ? String(row[2]).trim() : "Geral",
-        periodicidade: row[3] ? String(row[3]).trim() : "Diária",
-        obs: row[4] ? String(row[4]).trim() : ""
-      });
-    }
-    return list;
-  } catch (error) {
-    return { error: error.toString() };
-  }
-}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Setor</label>
+                <select id="setorFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm"></select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Periodicidade</label>
+                <select id="periodoFilter" onchange="filtrarDados()" class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm"></select>
+            </div>
+        </div>
 
-function salvarChecklistNoSheets(dadosChecklist) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Registro Checklist");
-    
-    // Se a aba não existir, cria com o cabeçalho novo incluindo a coluna Operador
-    if (!sheet) {
-      sheet = ss.insertSheet("Registro Checklist");
-      sheet.appendRow(["Data/Hora", "Máquina", "Item / Verificação", "Setor", "Periodicidade", "Status", "Operador", "OBS"]);
-    }
-    
-    var timestamp = new Date();
-    
-    dadosChecklist.forEach(function(r) {
-      sheet.appendRow([
-        timestamp,
-        r.maquina,
-        r.item,
-        r.setor,
-        r.periodicidade,
-        r.status,
-        r.operador, // Novo campo capturado no site
-        r.obs
-      ]);
-    });
-    
-    return { success: true, count: dadosChecklist.length };
-  } catch (error) {
-    return { success: false, error: error.toString() };
-  }
-}
+        <div id="loadingIndicator" class="hidden text-center py-12"><i class="fa-solid fa-circle-notch animate-spin text-3xl text-blue-600"></i></div>
+        <div id="checklistContainer" class="space-y-6"></div>
+
+        <div class="mt-8 pt-4 border-t border-slate-200 flex justify-end">
+            <button onclick="salvarChecklist()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Checklist
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal Config e Notificações (mesma estrutura anterior) -->
+    <div id="configModal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6">
+            <h3 class="font-bold mb-4">Conexão do Google Sheets</h3>
+            <input type="text" id="apiInputUrl" class="w-full border rounded-lg p-2.5 mb-4 text-xs" placeholder="Cole a URL do Apps Script aqui">
+            <button onclick="salvarConfigUrl()" class="w-full py-2 bg-blue-600 text-white rounded-lg">Salvar Link</button>
+        </div>
+    </div>
+
+    <script>
+        let originalDatabase = [];
+        let API_URL = localStorage.getItem("checklist_google_api_url") || "";
+
+        window.onload = () => {
+            if (API_URL) baixarDadosDaPlanilha();
+            else toggleConfigModal(true);
+        };
+
+        async function baixarDadosDaPlanilha() {
+            toggleLoading(true);
+            try {
+                const res = await fetch(`${API_URL}?action=carregarItens`);
+                originalDatabase = await res.json();
+                
+                // Popular filtros dinamicamente
+                const setores = [...new Set(originalDatabase.map(i => i.setor))];
+                const periodos = [...new Set(originalDatabase.map(i => i.periodicidade))];
+                
+                document.getElementById('setorFilter').innerHTML = setores.map(s => `<option value="${s}">${s}</option>`).join('');
+                document.getElementById('periodoFilter').innerHTML = periodos.map(p => `<option value="${p}">${p}</option>`).join('');
+                
+                filtrarDados();
+            } catch (e) { alert("Erro ao carregar dados."); }
+            toggleLoading(false);
+        }
+
+        function filtrarDados() {
+            const set = document.getElementById("setorFilter").value;
+            const per = document.getElementById("periodoFilter").value;
+            const container = document.getElementById("checklistContainer");
+            container.innerHTML = "";
+
+            const filtrados = originalDatabase.filter(x => x.setor === set && x.periodicidade === per);
+            const agrupado = {};
+            filtrados.forEach(d => {
+                if(!agrupado[d.maquina]) agrupado[d.maquina] = [];
+                agrupado[d.maquina].push(d);
+            });
+
+            for (let maq in agrupado) {
+                let html = `
+                    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <div class="bg-slate-800 text-white px-4 py-3 font-bold">${maq}</div>
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                                <tr><th class="p-3">Item / Instrução</th><th class="p-3">Operador</th><th class="p-3">Status</th><th class="p-3">OBS</th></tr>
+                            </thead>
+                            <tbody>`;
+                agrupado[maq].forEach(item => {
+                    html += `
+                        <tr class="row-check" data-maquina="${maq}" data-item="${item.item}">
+                            <td class="p-3 text-xs font-medium">
+                                ${item.item}
+                                ${item.obs ? `<div class="mt-1 text-[10px] text-blue-700 italic bg-blue-50 p-1 rounded">Obs: ${item.obs}</div>` : ''}
+                            </td>
+                            <td class="p-3"><input type="text" class="operador-inp w-full border rounded p-1 text-xs" placeholder="Nome"></td>
+                            <td class="p-3"><select class="status-sel border rounded p-1 text-xs"><option value="OK">OK</option><option value="Problema">Problema</option></select></td>
+                            <td class="p-3"><input type="text" class="obs-inp w-full border rounded p-1 text-xs" placeholder="Descreva problemas..."></td>
+                        </tr>`;
+                });
+                html += `</tbody></table></div>`;
+                container.innerHTML += html;
+            }
+        }
+
+        async function salvarChecklist() {
+            const rows = document.querySelectorAll(".row-check");
+            const payload = Array.from(rows).map(r => ({
+                maquina: r.getAttribute("data-maquina"),
+                item: r.getAttribute("data-item"),
+                setor: document.getElementById("setorFilter").value,
+                periodicidade: document.getElementById("periodoFilter").value,
+                status: r.querySelector(".status-sel").value,
+                operador: r.querySelector(".operador-inp").value,
+                obs: r.querySelector(".obs-inp").value
+            }));
+
+            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            alert("Checklist registrado com sucesso!");
+        }
+
+        function toggleLoading(active) { document.getElementById("loadingIndicator").classList.toggle("hidden", !active); }
+        function toggleConfigModal(show) { document.getElementById("configModal").classList.toggle("hidden", !show); }
+        function salvarConfigUrl() { 
+            localStorage.setItem("checklist_google_api_url", document.getElementById("apiInputUrl").value);
+            location.reload(); 
+        }
+    </script>
+</body>
+</html>
