@@ -3,83 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checklist Industrial</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body class="bg-slate-50 min-h-screen">
-
-    <header class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-10">
-        <h1 class="font-bold text-lg"><i class="fa-solid fa-clipboard-check mr-2 text-blue-400"></i>Checklist de Máquinas</h1>
-    </header>
-
-    <main class="max-w-xl mx-auto p-4 space-y-4" id="container">
-        <!-- Itens carregados via JS -->
-        <div id="loader" class="text-center py-20 text-slate-500">
-            <i class="fa-solid fa-spinner animate-spin text-3xl mb-4"></i>
-            <p>Carregando itens da planilha...</p>
+<body class="p-6 bg-slate-50">
+    <div id="container" class="max-w-2xl mx-auto">
+        <h1 class="text-xl font-bold mb-6 text-slate-800"><i class="fa-solid fa-clipboard-check mr-2 text-blue-600"></i>Checklist de Máquinas</h1>
+        <div id="lista" class="space-y-4">
+            <p class="text-center text-slate-500 py-10">Carregando itens...</p>
         </div>
-    </main>
+    </div>
 
     <script>
-        window.onload = () => {
-            google.script.run.withSuccessHandler(renderizar).carregarItens();
-        };
+        // Use aspas nas URLs!
+        const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbz_967kA31TkPc1-ijxu1d3bgYaebnEUYscP2pYkO9tdRbZV4an3zX_fQip7WZznSm6rg/exec";
+
+        async function carregarDados() {
+            try {
+                const response = await fetch(URL_WEB_APP);
+                const data = await response.json();
+                renderizar(data);
+            } catch (err) {
+                document.getElementById('lista').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar: ${err}</p>`;
+            }
+        }
 
         function renderizar(data) {
-            const container = document.getElementById("container");
-            container.innerHTML = "";
-
+            const lista = document.getElementById('lista');
+            lista.innerHTML = "";
+            
             data.forEach((item, index) => {
-                const card = document.createElement("div");
-                card.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-200";
-                card.innerHTML = `
-                    <div class="mb-3 border-b pb-2">
-                        <h3 class="font-bold text-slate-800 text-sm">${item.maquina}</h3>
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-200";
+                div.innerHTML = `
+                    <div class="mb-3">
+                        <h3 class="font-bold text-slate-800">${item.maquina}</h3>
                         <p class="text-xs text-slate-500">${item.item}</p>
                     </div>
-                    <div class="space-y-3">
-                        <input type="text" id="op-${index}" class="w-full border p-2 rounded-lg text-sm bg-slate-50" placeholder="Nome do Operador">
-                        
+                    <div class="space-y-2">
+                        <input type="text" id="op-${index}" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="Nome do Operador">
                         <div class="grid grid-cols-2 gap-2">
-                            <select id="st-${index}" class="border p-2 rounded-lg text-sm font-bold bg-slate-50">
-                                <option value="OK" class="text-emerald-600">✔️ OK</option>
-                                <option value="Problema" class="text-rose-600">⚠️ Problema</option>
+                            <select id="st-${index}" class="border p-2 rounded text-sm bg-slate-50">
+                                <option value="OK">✔️ OK</option>
+                                <option value="Problema">⚠️ Problema</option>
                             </select>
-                            <button onclick="enviar(${index}, '${item.maquina}', '${item.item}', '${item.setor}', '${item.periodicidade}')" 
-                                    class="bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all">
+                            <button onclick="registrar(${index}, '${item.maquina}', '${item.item}', '${item.setor}', '${item.periodicidade}')" 
+                                    class="bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700">
                                 Registrar
                             </button>
                         </div>
-                        <input type="text" id="ob-${index}" class="w-full border p-2 rounded-lg text-sm bg-slate-50" placeholder="Observações (opcional)">
+                        <input type="text" id="ob-${index}" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="Observações (opcional)">
                     </div>
                 `;
-                container.appendChild(card);
+                lista.appendChild(div);
             });
         }
 
-        function enviar(idx, maq, item, set, per) {
+        async function registrar(idx, maq, item, setor, periodo) {
             const payload = {
                 maquina: maq,
                 item: item,
-                setor: set,
-                periodicidade: per,
+                setor: setor,
+                periodicidade: periodo,
                 operador: document.getElementById(`op-${idx}`).value,
                 status: document.getElementById(`st-${idx}`).value,
                 obs: document.getElementById(`ob-${idx}`).value
             };
 
-            if(!payload.operador) return alert("Por favor, preencha o nome do operador.");
+            if(!payload.operador) return alert("Preencha o nome do operador!");
 
-            // Desabilita o botão para evitar cliques duplos
-            event.target.disabled = true;
-            event.target.innerText = "Enviando...";
-
-            google.script.run.withSuccessHandler(() => {
+            const btn = event.target;
+            btn.innerText = "Enviando...";
+            
+            try {
+                await fetch(URL_WEB_APP, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
                 alert("Registrado com sucesso!");
-                location.reload();
-            }).registrarChecklist(payload);
+                btn.innerText = "Registrar";
+            } catch (err) {
+                alert("Erro ao enviar.");
+                btn.innerText = "Registrar";
+            }
         }
+
+        window.onload = carregarDados;
     </script>
 </body>
 </html>
+```
+
+### O que eu corrigi:
+1.  **Sintaxe JavaScript:** Adicionei as aspas necessárias na variável `URL_WEB_APP` e na chamada `fetch`.
+2.  **Lógica de Renderização:** Preenchi a função `renderizar` para criar o layout (cards) para cada item que vem da planilha.
+3.  **Botão Registrar:** Conectei o botão ao evento de clique, passando os dados daquele item específico.
+4.  **UX (Experiência):** Adicionei uma estrutura básica com Tailwind para que a lista fique organizada e fácil de usar no celular.
+
+**Dica importante:** Se o erro de "Carregando..." persistir, verifique se no seu `Código.gs` (no Google Apps Script) você tem uma função `doGet` que retorna os dados via `ContentService.createTextOutput(JSON.stringify(lista))`. Se não tiver, o GitHub nunca receberá o JSON.
