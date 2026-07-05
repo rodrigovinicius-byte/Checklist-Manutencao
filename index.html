@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checklist Operacional</title>
+    <title>Checklist Operacional - Controle de Manutenção</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -19,15 +19,15 @@
                 <div class="p-2.5 bg-blue-600 rounded-lg"><i class="fa-solid fa-screwdriver-wrench text-xl"></i></div>
                 <div>
                     <h1 class="font-bold">Checklist de Manutenção</h1>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest">Sincronizado com Sheets</p>
+                    <p class="text-[10px] text-slate-400">Sincronizado com Google Sheets</p>
                 </div>
             </div>
-            <button onclick="toggleConfigModal(true)" class="bg-slate-800 border border-slate-700 text-xs py-2 px-4 rounded-lg hover:bg-slate-700 transition-colors">Configurar API</button>
+            <button onclick="toggleConfigModal(true)" class="bg-slate-800 border border-slate-700 text-xs py-2 px-4 rounded-lg hover:bg-slate-700">Configurar Conexão</button>
         </div>
     </header>
 
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6">
-        <div id="apiStatusAlert" class="mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-amber-50 border-amber-200 text-amber-800 hidden">
+        <div id="apiStatusAlert" class="mb-6 p-4 rounded-xl border flex items-center justify-between text-xs bg-amber-50 border-amber-200 text-amber-800">
             <span>Atenção: Configure a URL da sua API para começar.</span>
         </div>
 
@@ -46,18 +46,18 @@
         <div id="checklistContainer" class="space-y-6"></div>
 
         <div class="mt-8 pt-4 border-t border-slate-200 flex justify-end">
-            <button id="btnEnviar" onclick="salvarChecklist()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                <i class="fa-solid fa-cloud-arrow-up"></i> <span>Enviar Checklist</span>
+            <button onclick="salvarChecklist()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Checklist
             </button>
         </div>
     </main>
 
-    <!-- Modal Config -->
+    <!-- Modal Config e Notificações (mesma estrutura anterior) -->
     <div id="configModal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <h3 class="font-bold mb-4">Configurar Conexão</h3>
-            <input type="text" id="apiInputUrl" class="w-full border rounded-lg p-3 mb-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cole a URL do Apps Script aqui">
-            <button onclick="salvarConfigUrl()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Salvar Link</button>
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6">
+            <h3 class="font-bold mb-4">Conexão do Google Sheets</h3>
+            <input type="text" id="apiInputUrl" class="w-full border rounded-lg p-2.5 mb-4 text-xs" placeholder="Cole a URL do Apps Script aqui">
+            <button onclick="salvarConfigUrl()" class="w-full py-2 bg-blue-600 text-white rounded-lg">Salvar Link</button>
         </div>
     </div>
 
@@ -75,12 +75,16 @@
             try {
                 const res = await fetch(`${API_URL}?action=carregarItens`);
                 originalDatabase = await res.json();
+                
+                // Popular filtros dinamicamente
                 const setores = [...new Set(originalDatabase.map(i => i.setor))];
                 const periodos = [...new Set(originalDatabase.map(i => i.periodicidade))];
+                
                 document.getElementById('setorFilter').innerHTML = setores.map(s => `<option value="${s}">${s}</option>`).join('');
                 document.getElementById('periodoFilter').innerHTML = periodos.map(p => `<option value="${p}">${p}</option>`).join('');
+                
                 filtrarDados();
-            } catch (e) { alert("Erro ao carregar dados. Verifique a URL da API."); }
+            } catch (e) { alert("Erro ao carregar dados."); }
             toggleLoading(false);
         }
 
@@ -100,19 +104,22 @@
             for (let maq in agrupado) {
                 let html = `
                     <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div class="bg-slate-800 text-white px-4 py-3 font-bold text-sm">${maq}</div>
-                        <table class="w-full text-left text-xs">
-                            <thead class="bg-slate-50 uppercase text-slate-500">
-                                <tr><th class="p-3">Item</th><th class="p-3">Operador</th><th class="p-3">Status</th><th class="p-3">OBS</th></tr>
+                        <div class="bg-slate-800 text-white px-4 py-3 font-bold">${maq}</div>
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                                <tr><th class="p-3">Item / Instrução</th><th class="p-3">Operador</th><th class="p-3">Status</th><th class="p-3">OBS</th></tr>
                             </thead>
                             <tbody>`;
                 agrupado[maq].forEach(item => {
                     html += `
-                        <tr class="row-check border-t" data-maquina="${maq}" data-item="${item.item}">
-                            <td class="p-3 font-medium">${item.item} ${item.obs ? `<div class="mt-1 text-[10px] text-blue-700 italic bg-blue-50 p-1 rounded">Obs: ${item.obs}</div>` : ''}</td>
-                            <td class="p-2"><input type="text" class="operador-inp w-full border rounded p-1.5 focus:ring-1 outline-none" placeholder="Nome"></td>
-                            <td class="p-2"><select class="status-sel border rounded p-1.5 w-full"><option value="OK">OK</option><option value="Problema">Problema</option></select></td>
-                            <td class="p-2"><input type="text" class="obs-inp w-full border rounded p-1.5 focus:ring-1 outline-none" placeholder="Ocorrências..."></td>
+                        <tr class="row-check" data-maquina="${maq}" data-item="${item.item}">
+                            <td class="p-3 text-xs font-medium">
+                                ${item.item}
+                                ${item.obs ? `<div class="mt-1 text-[10px] text-blue-700 italic bg-blue-50 p-1 rounded">Obs: ${item.obs}</div>` : ''}
+                            </td>
+                            <td class="p-3"><input type="text" class="operador-inp w-full border rounded p-1 text-xs" placeholder="Nome"></td>
+                            <td class="p-3"><select class="status-sel border rounded p-1 text-xs"><option value="OK">OK</option><option value="Problema">Problema</option></select></td>
+                            <td class="p-3"><input type="text" class="obs-inp w-full border rounded p-1 text-xs" placeholder="Descreva problemas..."></td>
                         </tr>`;
                 });
                 html += `</tbody></table></div>`;
@@ -122,38 +129,18 @@
 
         async function salvarChecklist() {
             const rows = document.querySelectorAll(".row-check");
-            // Filtra apenas as linhas onde o operador digitou o nome
-            const payload = Array.from(rows)
-                .filter(r => r.querySelector(".operador-inp").value.trim() !== "")
-                .map(r => ({
-                    maquina: r.getAttribute("data-maquina"),
-                    item: r.getAttribute("data-item"),
-                    setor: document.getElementById("setorFilter").value,
-                    periodicidade: document.getElementById("periodoFilter").value,
-                    operador: r.querySelector(".operador-inp").value.trim(),
-                    status: r.querySelector(".status-sel").value,
-                    obs: r.querySelector(".obs-inp").value
-                }));
+            const payload = Array.from(rows).map(r => ({
+                maquina: r.getAttribute("data-maquina"),
+                item: r.getAttribute("data-item"),
+                setor: document.getElementById("setorFilter").value,
+                periodicidade: document.getElementById("periodoFilter").value,
+                status: r.querySelector(".status-sel").value,
+                operador: r.querySelector(".operador-inp").value,
+                obs: r.querySelector(".obs-inp").value
+            }));
 
-            if(payload.length === 0) {
-                alert("Preencha pelo menos um campo de 'Operador' para enviar!");
-                return;
-            }
-
-            const btn = document.getElementById("btnEnviar");
-            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Enviando...';
-            btn.disabled = true;
-
-            try {
-                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-                alert("Checklist registrado com sucesso!");
-                location.reload(); // Recarrega para limpar os campos
-            } catch(e) {
-                alert("Erro ao enviar. Tente novamente.");
-            } finally {
-                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Checklist';
-                btn.disabled = false;
-            }
+            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            alert("Checklist registrado com sucesso!");
         }
 
         function toggleLoading(active) { document.getElementById("loadingIndicator").classList.toggle("hidden", !active); }
@@ -165,9 +152,3 @@
     </script>
 </body>
 </html>
-```
-
-### O próximo passo
-Como você já tem o código do frontend, certifique-se de que o seu `Código.gs` (no Google Apps Script) está configurado para receber esse `JSON` corretamente, como vimos anteriormente, usando o `JSON.parse(e.postData.contents)`.
-
-Está tudo pronto para rodar? Se precisar de ajuda para testar o envio ou ajustar o `Código.gs` novamente, é só avisar!
