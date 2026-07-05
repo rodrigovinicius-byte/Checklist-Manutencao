@@ -3,82 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checklist Industrial</title>
+    <title>Dashboard Industrial</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen">
 
-    <header class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-10">
-        <h1 class="font-bold text-lg"><i class="fa-solid fa-clipboard-check mr-2 text-blue-400"></i>Checklist de Máquinas</h1>
-    </header>
+    <!-- Navegação -->
+    <nav class="bg-slate-900 text-white p-4 shadow-lg">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="font-bold"><i class="fa-solid fa-list-check mr-2 text-blue-400"></i>Painel Industrial</h1>
+            <button onclick="showPage('home')" class="text-xs bg-slate-700 px-3 py-1 rounded hover:bg-slate-600"><i class="fa-solid fa-house"></i></button>
+        </div>
+    </nav>
 
-    <main class="max-w-xl mx-auto p-4 space-y-4" id="container">
-        <!-- Itens carregados via JS -->
-        <div id="loader" class="text-center py-20 text-slate-500">
-            <i class="fa-solid fa-spinner animate-spin text-3xl mb-4"></i>
-            <p>Carregando itens da planilha...</p>
+    <main class="max-w-4xl mx-auto p-6" id="app">
+        <!-- PÁGINA HOME -->
+        <div id="page-home" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button onclick="showPage('producao')" class="bg-white p-6 rounded-xl shadow border border-slate-200 hover:border-blue-500 transition-all text-left">
+                <i class="fa-solid fa-industry text-2xl text-blue-600 mb-3"></i>
+                <h3 class="font-bold">Produção</h3>
+            </button>
+            <button onclick="showPage('manutencao')" class="bg-white p-6 rounded-xl shadow border border-slate-200 hover:border-emerald-500 transition-all text-left">
+                <i class="fa-solid fa-screwdriver-wrench text-2xl text-emerald-600 mb-3"></i>
+                <h3 class="font-bold">Manutenção</h3>
+            </button>
+            <button onclick="showPage('requisicao')" class="bg-white p-6 rounded-xl shadow border border-slate-200 hover:border-amber-500 transition-all text-left">
+                <i class="fa-solid fa-box-open text-2xl text-amber-600 mb-3"></i>
+                <h3 class="font-bold">Requisição</h3>
+            </button>
+        </div>
+
+        <!-- PÁGINAS -->
+        <div id="page-producao" class="hidden space-y-4">
+            <h2 class="text-xl font-bold mb-4 text-slate-800">Checklist Produção</h2>
+            <!-- Exemplo de formulário para enviar dados -->
+            <input type="text" id="op-prod" placeholder="Nome Operador" class="w-full p-2 border rounded">
+            <button onclick="enviarDados('Produção', 'Prensa A', 'Limpeza')" class="bg-blue-600 text-white p-2 rounded">Enviar</button>
+        </div>
+        
+        <div id="page-manutencao" class="hidden space-y-4">
+             <h2 class="text-xl font-bold mb-4 text-slate-800">Checklist Manutenção</h2>
+             <button onclick="enviarDados('Manutenção', 'Máquina X', 'Lubrificação')" class="bg-emerald-600 text-white p-2 rounded">Enviar</button>
         </div>
     </main>
 
     <script>
-        window.onload = () => {
-            google.script.run.withSuccessHandler(renderizar).carregarItens();
-        };
+        const WEB_APP_URL = "COLE_AQUI_A_URL_DO_SEU_APPS_SCRIPT";
 
-        function renderizar(data) {
-            const container = document.getElementById("container");
-            container.innerHTML = "";
-
-            data.forEach((item, index) => {
-                const card = document.createElement("div");
-                card.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-200";
-                card.innerHTML = `
-                    <div class="mb-3 border-b pb-2">
-                        <h3 class="font-bold text-slate-800 text-sm">${item.maquina}</h3>
-                        <p class="text-xs text-slate-500">${item.item}</p>
-                    </div>
-                    <div class="space-y-3">
-                        <input type="text" id="op-${index}" class="w-full border p-2 rounded-lg text-sm bg-slate-50" placeholder="Nome do Operador">
-                        
-                        <div class="grid grid-cols-2 gap-2">
-                            <select id="st-${index}" class="border p-2 rounded-lg text-sm font-bold bg-slate-50">
-                                <option value="OK" class="text-emerald-600">✔️ OK</option>
-                                <option value="Problema" class="text-rose-600">⚠️ Problema</option>
-                            </select>
-                            <button onclick="enviar(${index}, '${item.maquina}', '${item.item}', '${item.setor}', '${item.periodicidade}')" 
-                                    class="bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all">
-                                Registrar
-                            </button>
-                        </div>
-                        <input type="text" id="ob-${index}" class="w-full border p-2 rounded-lg text-sm bg-slate-50" placeholder="Observações (opcional)">
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+        function showPage(pageId) {
+            document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + pageId).classList.remove('hidden');
         }
 
-        function enviar(idx, maq, item, set, per) {
+        async function enviarDados(setor, maq, item) {
             const payload = {
+                setor: setor,
                 maquina: maq,
                 item: item,
-                setor: set,
-                periodicidade: per,
-                operador: document.getElementById(`op-${idx}`).value,
-                status: document.getElementById(`st-${idx}`).value,
-                obs: document.getElementById(`ob-${idx}`).value
+                operador: document.getElementById('op-prod')?.value || "N/A",
+                status: "OK",
+                obs: ""
             };
 
-            if(!payload.operador) return alert("Por favor, preencha o nome do operador.");
+            const btn = event.target;
+            btn.innerText = "Enviando...";
 
-            // Desabilita o botão para evitar cliques duplos
-            event.target.disabled = true;
-            event.target.innerText = "Enviando...";
-
-            google.script.run.withSuccessHandler(() => {
-                alert("Registrado com sucesso!");
-                location.reload();
-            }).registrarChecklist(payload);
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Necessário para evitar erro de CORS
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                alert("Dados enviados com sucesso!");
+                btn.innerText = "Enviar";
+            } catch (err) {
+                alert("Erro ao enviar: " + err);
+            }
         }
     </script>
 </body>
